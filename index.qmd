@@ -56,3 +56,54 @@ knitr::opts_chunk$set(margin     = TRUE,
                       fig.width  = eps * figw,
                       fig.height = eps * figh) 
 ```
+
+```{r}
+library(deSolve)
+```
+
+$$
+\frac{dS}{dt} = (I_t + I_a + I_s)\gamma + (1 - p)\alpha I_s -
+                [(I_t + I_a)c + I_s]\beta S
+$$
+
+$$
+\frac{dI_s}{dt} = \beta I_s S - (\gamma + \alpha)I_s
+$$
+
+$$
+\frac{dI_a}{dt} = p\alpha I_s - \gamma I_a
+$$
+
+$$
+\frac{I_t}{dt} = (I_t + I_a)Sc\beta - \gamma I_t
+$$
+
+```{r}
+model <- function(time, state, pars) {
+  with(as.list(c(state, pars)), {
+    G <- c * beta * (Ia + It) * S
+    A <- beta * Is * S
+    B <- gamma * Is
+    C <- gamma * Ia
+    D <- gamma * It
+    E <- alpha * Is
+    
+    dS  <- B + C + D + (1 - p) * E - G - A
+    dIs <- A - B - E
+    dIa <- p * E - C
+    dIt <- G - D
+    
+    list(c(dS, dIs, dIa, dIt))
+  })
+}
+```
+
+```{r eval = FALSE}
+f <- function(beta, c, gamma, alpha, p, times = seq(0, 10, le = 512)) {
+  S0 <- gamma / beta
+  ode(c(S = S0, Is = 1 - S0, Ia = 0, It = 0), times, model)  
+}
+
+f()
+```
+
