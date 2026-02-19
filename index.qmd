@@ -1,0 +1,48 @@
+---
+title: "Acquired and transmitted resistance"
+number-sections: true
+format:
+  html:
+    toc: true
+    toc-depth: 4
+editor: source
+editor_options: 
+  chunk_output_type: console
+#bibliography: references.bib
+#csl: the-american-naturalist.csl
+---
+
+```{r include = FALSE, eval = FALSE}
+knitr::purl("data.qmd", "tmp.R", documentation = FALSE)
+source("tmp.R")
+file.remove("tmp.R")
+
+add_nojekyll <- function() {
+  file <- ".nojekyll"
+  file.create(file)
+  gert::git_add(file)
+  gert::git_commit("Adding the .nojekyll file")
+  gert::git_push()
+}
+```
+
+```{r include = FALSE}
+setHook("plot.new", NULL, action = "replace")
+
+par2 <- function(...) par(..., mgp = c(1.5, .5, 0), bty = "n")
+
+knitr::knit_hooks$set(
+  margin = function(before, options, envir) {
+    if (before) par2(plt = c(.105, .97, .15, .95)) else NULL
+  })
+
+figw <- 7  # default is 7
+figh <- 5  # default is 5
+eps <- .7
+
+knitr::opts_chunk$set(margin     = TRUE,
+                      fig.retina = 2,
+                      fig.align  = "center",
+                      fig.width  = eps * figw,
+                      fig.height = eps * figh) 
+```
