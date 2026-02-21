@@ -57,8 +57,11 @@ knitr::opts_chunk$set(margin     = TRUE,
                       fig.height = eps * figh) 
 ```
 
-```{r}
+```{r message = FALSE}
 library(deSolve)
+library(tibble)
+library(dplyr)
+library(tidyr)
 ```
 
 $$
@@ -81,29 +84,92 @@ $$
 ```{r}
 model <- function(time, state, pars) {
   with(as.list(c(state, pars)), {
-    G <- c * beta * (Ia + It) * S
-    A <- beta * Is * S
-    B <- gamma * Is
-    C <- gamma * Ia
-    D <- gamma * It
-    E <- alpha * Is
+    incidenceT <- (1 - c) * beta * (Ia + It) * S
+    incidenceS <- beta * Is * S
+    recoveryS <- gamma * Is
+    recoveryA <- gamma * Ia
+    recoveryT <- gamma * It
+    treated <- alpha * Is
+    incidenceA <- p * treated
     
-    dS  <- B + C + D + (1 - p) * E - G - A
-    dIs <- A - B - E
-    dIa <- p * E - C
-    dIt <- G - D
+    dS  <- recoveryS + recoveryA + recoveryT + (1 - p) * treated -
+           incidenceT - incidenceS
+    dIs <- incidenceS - recoveryS - treated
+    dIa <- incidenceA - recoveryA
+    dIt <- incidenceT - recoveryT
+    cIncS <- incidenceS
+    cIncA <- incidenceA
+    cIncT <- incidenceT
     
-    list(c(dS, dIs, dIa, dIt))
+    list(c(dS, dIs, dIa, dIt, cIncS, cIncA, cIncT))
   })
 }
 ```
 
-```{r eval = FALSE}
-f <- function(beta, c, gamma, alpha, p, times = seq(0, 10, le = 512)) {
-  S0 <- gamma / beta
-  ode(c(S = S0, Is = 1 - S0, Ia = 0, It = 0), times, model)  
-}
 
-f()
+Prevalance is:
+
+$$
+\mbox{P} = 1 - \frac{\gamma}{\beta}
+$$
+
+Incidence is:
+
+$$
+\mbox{I} = (\beta - \gamma)\frac{\gamma}{\beta}
+$$
+
+$\beta$ as a function of prevalence and incidence:
+
+$$
+\beta = \frac{\mbox{I}}{(1 - \mbox{P})\mbox{P}}
+$$
+
+$\gamma$ as a function of prevalence and $\beta$:
+
+$$
+\gamma = (1 - \mbox{P})\beta
+$$
+
+```{r}
+simulate <- function(P, I, alpha, p, c, times = seq(0, 40, le = 512)) {
+  S0 <- 1 - P
+  beta <- I / (S0 * P)
+  gamma <- beta * S0
+  print(gamma)
+  ode(c(S = S0, Is = P, Ia = 0, It = 0, cIncS = 0, cIncA = 0, cIncT = 0),
+      times, model,
+      c(beta = beta, gamma = gamma, alpha = alpha, p = p, c = c)) |> 
+    as.data.frame() |> 
+    as_tibble() |> 
+    select(time, starts_with("c")) |> 
+    mutate(across(-1, ~ c(diff(.x) / diff(time), NA))) |> 
+    setNames(c("time", "incS", "incA", "incT")) |> 
+    head(-1)
+}
 ```
 
+```{r}
+plots <- function(...) plot(..., type = "s", lwd = 2, axes = FALSE, ann = FALSE)
+```
+
+```{r}
+plot_output <- function(x) {
+  x <- x |> 
+    mutate(incR  = incA + incT,
+           inc   = incS + incR,
+           pincR = incR / inc,
+           pincA = incA / incR,
+           across(inc, ~ .x * 1e5))
+  with(x, {
+    plots(time, inc); par(new = TRUE)
+    plots(time, pincR, col = "red"); par(new = TRUE)
+    plots(time, pincA, col = "orange")
+  })
+}
+```
+
+```{r fig-simulation}
+simulate(P = 300 * 1e-5, I = 200 * 1e-5, alpha = .05, p = .5, c = .2) |> 
+  plot_output()
+```
